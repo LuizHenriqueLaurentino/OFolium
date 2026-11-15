@@ -1,7 +1,23 @@
 export type ManagerialPdfRow = {
   employeeName: string;
   role: string;
+  baseSalary: number;
+  overtimeHours: string;
+  extras: number;
+  absenceCount: number;
+  absenceDiscount: number;
+  additions: number;
+  vales: number;
+  discounts: number;
   forecast: number;
+};
+
+export type ManagerialPdfMovement = {
+  employeeName: string;
+  occurrenceDate: string;
+  type: string;
+  detail: string;
+  valueLabel: string;
 };
 
 export type ManagerialPdfInput = {
@@ -10,6 +26,7 @@ export type ManagerialPdfInput = {
   competenceLabel: string;
   generatedAt: Date;
   rows: ManagerialPdfRow[];
+  movements: ManagerialPdfMovement[];
   totalForecast: number;
 };
 

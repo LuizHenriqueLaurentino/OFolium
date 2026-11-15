@@ -5,20 +5,15 @@ import type {
   Movement,
 } from '@/data/types';
 import { isEmployeeActive } from '@/utils/employee';
+import { parseHoursToMinutes, valueToDecimalHours } from '@/utils/hoursDuration';
+
+export { parseHoursToMinutes, valueToDecimalHours };
 
 export const ESTIMATE_DISCLAIMER =
   'Cálculo gerencial estimado. O valor oficial deverá ser confirmado pela contabilidade.';
 
 export const MANAGERIAL_DISCLAIMER =
   'Os valores apresentados possuem finalidade gerencial e não substituem a folha de pagamento oficial ou a conferência contábil.';
-
-export function parseHoursToMinutes(value: string): number {
-  const hoursMatch = value.match(/(\d+)\s*h/);
-  const minutesMatch = value.match(/(\d+)\s*(?:min|m(?!ês))/i) ?? value.match(/h(\d+)/);
-  const hours = hoursMatch ? Number.parseInt(hoursMatch[1], 10) : 0;
-  const minutes = minutesMatch ? Number.parseInt(minutesMatch[1], 10) : 0;
-  return hours * 60 + minutes;
-}
 
 export function formatMinutesAsHours(totalMinutes: number): string {
   if (totalMinutes <= 0) return '0h';

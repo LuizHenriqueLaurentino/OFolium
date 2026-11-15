@@ -10,15 +10,15 @@ import { HorizontalTableScroll } from '@/components/ui/HorizontalTableScroll';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/StatCard';
 import { BrandColors } from '@/constants/colors';
+import type { Movement } from '@/data/types';
 import { MOBILE_STAT_CARD_WIDTH, MobileSpace } from '@/constants/layout';
 import { REPORTS_STAT_ICONS } from '@/constants/statIcons';
-import { ProLockedButton, useAppData } from '@/contexts/AppDataContext';
+import { useAppData } from '@/contexts/AppDataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployees } from '@/contexts/EmployeesContext';
-import { usePlan } from '@/contexts/PlanContext';
 import { useManagerialPdfExport } from '@/hooks/useManagerialPdfExport';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
-import { MANAGERIAL_DISCLAIMER } from '@/utils/calculations';
+import { formatMinutesAsHours, MANAGERIAL_DISCLAIMER, shouldApplyDiscount, sumMovementsByType } from '@/utils/calculations';
 import { CURRENT_COMPETENCE, getCalendarCompetence } from '@/utils/competence';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import {
@@ -33,8 +33,22 @@ import {
 
 type ActiveFilterKey = 'employee' | 'period' | 'recordType';
 
+function movementDetail(movement: Movement): string {
+  if (movement.type === 'Falta') return movement.absenceSubtype || movement.value || '—';
+  if (movement.type === 'Hora extra') return movement.notes?.trim() || '—';
+  return movement.notes?.trim() || movement.value || '—';
+}
+
+function movementValueLabel(movement: Movement): string {
+  if (movement.type === 'Hora extra') {
+    const duration = movement.value?.trim();
+    const money = formatCurrency(movement.amount ?? 0);
+    return duration ? `${duration} · ${money}` : money;
+  }
+  return formatCurrency(movement.amount ?? 0);
+}
+
 export default function ReportsScreen() {
-  const { isPro } = usePlan();
   const { business, user } = useAuth();
   const { isCompactLayout } = useResponsiveLayout();
   const { exportPdf, isExporting, successMessage, errorMessage } = useManagerialPdfExport();
@@ -104,11 +118,42 @@ export default function ReportsScreen() {
       competence: filters.competence,
       competenceLabel: statementData.competenceLabel,
       generatedAt: new Date(),
-      rows: statementData.summaryRows.map((row) => ({
-        employeeName: row.employeeName,
-        role: row.role,
-        forecast: row.forecast,
-      })),
+      rows: statementData.summaryRows.map((row) => {
+        const employee = employees.find((item) => item.id === row.employeeId);
+        const employeeMovements = getMovementsForEmployee(row.employeeId, filters.competence);
+        const totals = sumMovementsByType(employeeMovements);
+        let absenceDiscount = 0;
+        let eventDiscounts = 0;
+        employeeMovements.forEach((movement) => {
+          if (movement.type === 'Falta' && shouldApplyDiscount(movement)) {
+            absenceDiscount += movement.amount ?? 0;
+          }
+          if (movement.type === 'Desconto') eventDiscounts += movement.amount ?? 0;
+        });
+        return {
+          employeeName: row.employeeName,
+          role: row.role,
+          baseSalary: employee?.baseSalary ?? 0,
+          overtimeHours: formatMinutesAsHours(totals.overtimeMinutes),
+          extras: totals.extras,
+          absenceCount: totals.absenceCount,
+          absenceDiscount,
+          additions: totals.additions,
+          vales: totals.vales,
+          discounts: eventDiscounts,
+          forecast: row.forecast,
+        };
+      }),
+      movements: statementData.summaryRows
+        .flatMap((row) => getMovementsForEmployee(row.employeeId, filters.competence))
+        .sort((a, b) => a.employeeName.localeCompare(b.employeeName) || a.occurrenceDate.localeCompare(b.occurrenceDate))
+        .map((movement) => ({
+          employeeName: movement.employeeName,
+          occurrenceDate: formatShortDate(movement.occurrenceDate),
+          type: movement.type,
+          detail: movementDetail(movement),
+          valueLabel: movementValueLabel(movement),
+        })),
       totalForecast: statementData.totalForecast,
     });
   };
@@ -327,11 +372,15 @@ export default function ReportsScreen() {
 
         <View style={styles.exportActions}>
           <ExportPdfButton onExport={handleExportPdf} isExporting={isExporting} fullWidth variant="primary" />
-          {isPro ? (
-            <Button label="Exportar Excel/CSV" variant="outline" fullWidth onPress={() => {}} />
-          ) : (
-            <ProLockedButton label="Exportar Excel/CSV" feature="export_spreadsheet" fullWidth />
-          )}
+          <View
+            style={styles.unavailableExport}
+            accessibilityRole="text"
+            accessibilityLabel="Exportação em Excel e CSV indisponível. O recurso está em desenvolvimento.">
+            <Text style={styles.unavailableExportTitle}>Excel/CSV indisponível</Text>
+            <Text style={styles.unavailableExportText}>
+              A exportação em Excel e CSV está em desenvolvimento.
+            </Text>
+          </View>
         </View>
       </Card>
 
@@ -449,4 +498,23 @@ const styles = StyleSheet.create({
   previewFooterLabel: { fontSize: 14, fontWeight: '700', color: BrandColors.textPrimary },
   previewFooterValue: { fontSize: 16, fontWeight: '700', color: BrandColors.orange },
   exportActions: { gap: 12, marginTop: 20 },
+  unavailableExport: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BrandColors.border,
+    backgroundColor: BrandColors.offWhite,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  unavailableExportTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: BrandColors.textSecondary,
+  },
+  unavailableExportText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: BrandColors.textMuted,
+  },
 });

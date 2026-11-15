@@ -1,6 +1,7 @@
 import type { ActivityItem, Movement } from '@/data/types';
 import { BrandColors } from '@/constants/colors';
-import { parseHoursToMinutes } from '@/utils/calculations';
+
+export { valueToDecimalHours } from '@/utils/hoursDuration';
 
 function formatActivityTime(createdAt: string): string {
   const created = new Date(createdAt);
@@ -52,8 +53,3 @@ export function buildActivitiesFromMovements(movements: Movement[]): ActivityIte
     }));
 }
 
-export function valueToDecimalHours(value: string): number | null {
-  const minutes = parseHoursToMinutes(value);
-  if (minutes <= 0) return null;
-  return Math.round((minutes / 60) * 100) / 100;
-}

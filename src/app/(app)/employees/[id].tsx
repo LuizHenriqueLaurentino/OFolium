@@ -1071,7 +1071,7 @@ function RegisterFlowModal({
     switch (step) {
       case 'Hora extra':
         if (valueToDecimalHours(duration.trim()) === null) {
-          setFormError('Informe a duração no formato 2h30.');
+          setFormError('Informe a duração no formato 2h30, 1,5h ou 30min.');
           return;
         }
         value = duration.trim();

@@ -9,6 +9,7 @@ import { StatCardsRow } from '@/components/StatCard';
 import { WeeklyRecords } from '@/components/WeeklyRecords';
 import { useAppShellUI } from '@/contexts/AppShellUIContext';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useEmployees } from '@/contexts/EmployeesContext';
 import { usePlan } from '@/contexts/PlanContext';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
@@ -17,6 +18,7 @@ import {
   addMonthsToCompetence,
   competenceIndex,
   competenceToLabel,
+  CURRENT_COMPETENCE,
   getCalendarCompetence,
   isCompetenceInBaseHistory,
 } from '@/utils/competence';
@@ -40,19 +42,20 @@ export default function DashboardScreen() {
   const shouldAnimateEntry = useRef(consumeDashboardEntryAnimation()).current;
   const animateEntry = shouldAnimateEntry && !prefersReducedMotion;
   const { isPro } = usePlan();
+  const { isDemoMode } = useEmployees();
   const { isMobile, isCompactLayout, contentPaddingHorizontal, contentPaddingBottom } =
     useResponsiveLayout();
   const isCompact = isCompactLayout;
   const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
   const [employeeQuery, setEmployeeQuery] = useState('');
-  const [selectedCompetence, setSelectedCompetence] = useState(() => getCalendarCompetence());
+  const referenceCompetence = isDemoMode ? CURRENT_COMPETENCE : getCalendarCompetence();
+  const [selectedCompetence, setSelectedCompetence] = useState(referenceCompetence);
   const [competenceNotice, setCompetenceNotice] = useState<string | null>(null);
-  const calendarCompetence = getCalendarCompetence();
-  const canAdvanceCompetence = competenceIndex(selectedCompetence) < competenceIndex(calendarCompetence);
+  const canAdvanceCompetence = competenceIndex(selectedCompetence) < competenceIndex(referenceCompetence);
 
   const selectPreviousCompetence = () => {
     const previous = addMonthsToCompetence(selectedCompetence, -1);
-    if (!isPro && !isCompetenceInBaseHistory(previous, calendarCompetence)) {
+    if (!isPro && !isCompetenceInBaseHistory(previous, referenceCompetence)) {
       setCompetenceNotice(BASE_HISTORY_MESSAGE);
       return;
     }

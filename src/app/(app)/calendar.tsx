@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/mobile/Screen';
@@ -8,9 +8,11 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { BrandColors } from '@/constants/colors';
 import { MIN_TOUCH_TARGET } from '@/constants/layout';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useEmployees } from '@/contexts/EmployeesContext';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import type { Movement, RecordType } from '@/data/types';
 import { DEMO_TODAY } from '@/utils/competence';
+import { getLocalTodayIso } from '@/utils/dateInput';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -35,30 +37,35 @@ const legend: { type: RecordType; color: string }[] = [
   { type: 'Desconto', color: BrandColors.red },
 ];
 
+function parseIsoDate(iso: string): { year: number; month: number; day: number } {
+  const [year, month, day] = iso.split('-').map(Number);
+  return { year, month: month - 1, day };
+}
+
+function shiftMonth(year: number, month: number, direction: -1 | 1): { year: number; month: number } {
+  const next = new Date(year, month + direction, 1);
+  return { year: next.getFullYear(), month: next.getMonth() };
+}
+
 export default function CalendarScreen() {
-  const { movements, getMovementsForDate } = useAppData();
+  const { getMovementsForDate } = useAppData();
+  const { isDemoMode } = useEmployees();
   const { isMobile } = useResponsiveLayout();
-  const [month, setMonth] = useState(7);
-  const [year] = useState(2026);
+  const reference = parseIsoDate(isDemoMode ? DEMO_TODAY : getLocalTodayIso());
+  const [month, setMonth] = useState(reference.month);
+  const [year, setYear] = useState(reference.year);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
 
-  const recordsByDate = useMemo(() => {
-    const map = new Map<string, Movement[]>();
-    movements.forEach((record) => {
-      const existing = map.get(record.occurrenceDate) ?? [];
-      map.set(record.occurrenceDate, [...existing, record]);
-    });
-    return map;
-  }, [movements]);
-
   const selectedRecords = selectedDate ? getMovementsForDate(selectedDate) : [];
-  const todayDay = Number.parseInt(DEMO_TODAY.split('-')[2] ?? '14', 10);
 
-  const prevMonth = () => setMonth((m) => (m === 0 ? 11 : m - 1));
-  const nextMonth = () => setMonth((m) => (m === 11 ? 0 : m + 1));
+  const goToMonth = (direction: -1 | 1) => {
+    const next = shiftMonth(year, month, direction);
+    setYear(next.year);
+    setMonth(next.month);
+  };
 
   const calendarDays: (number | null)[] = [
     ...Array(firstDayOfWeek).fill(null),
@@ -71,13 +78,13 @@ export default function CalendarScreen() {
 
       <Card>
         <View style={styles.monthSelector}>
-          <Pressable onPress={prevMonth} style={[styles.monthArrow, isMobile && styles.monthArrowMobile]}>
+          <Pressable onPress={() => goToMonth(-1)} style={[styles.monthArrow, isMobile && styles.monthArrowMobile]}>
             <Text style={styles.monthArrowText}>‹</Text>
           </Pressable>
           <Text style={[styles.monthLabel, isMobile && styles.monthLabelMobile]}>
             {MONTHS[month]} de {year}
           </Text>
-          <Pressable onPress={nextMonth} style={[styles.monthArrow, isMobile && styles.monthArrowMobile]}>
+          <Pressable onPress={() => goToMonth(1)} style={[styles.monthArrow, isMobile && styles.monthArrowMobile]}>
             <Text style={styles.monthArrowText}>›</Text>
           </Pressable>
         </View>
@@ -108,8 +115,9 @@ export default function CalendarScreen() {
             }
 
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const dayRecords = recordsByDate.get(dateStr) ?? [];
-            const isToday = day === todayDay && month === 7;
+            const dayRecords = getMovementsForDate(dateStr);
+            const isToday =
+              year === reference.year && month === reference.month && day === reference.day;
 
             return (
               <Pressable
@@ -158,6 +166,7 @@ function DayRecordsModal({
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    year: 'numeric',
   });
 
   return (
